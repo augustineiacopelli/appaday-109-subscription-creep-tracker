@@ -382,6 +382,99 @@
     .content-grid { grid-template-columns: 1fr; }
     table { display: block; overflow-x: auto; }
   }
+
+  #printReport { display: none; }
+
+  @media print {
+    body > *:not(#printReport) { display: none !important; }
+    #printReport { display: block !important; }
+
+    body {
+      background: #fff;
+      color: #111;
+    }
+
+    #printReport {
+      font-family: 'IBM Plex Sans', sans-serif;
+      color: #111;
+      max-width: 100%;
+      padding: 0.4in;
+    }
+
+    .print-title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      border-bottom: 2px solid #111;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+    }
+
+    .print-title-row h1 {
+      font-family: 'Fraunces', serif;
+      font-size: 1.3rem;
+      margin: 0;
+    }
+
+    .print-date { font-size: 0.8rem; color: #555; }
+
+    .print-summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .print-summary div {
+      border: 1px solid #999;
+      padding: 6px 8px;
+      font-size: 0.78rem;
+    }
+
+    .print-summary .print-stat-label {
+      display: block;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #555;
+      margin-bottom: 2px;
+    }
+
+    .print-section-title {
+      font-family: 'Fraunces', serif;
+      font-size: 1rem;
+      margin: 18px 0 8px;
+      border-bottom: 1px solid #999;
+      padding-bottom: 4px;
+    }
+
+    table.print-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      margin-bottom: 10px;
+    }
+
+    table.print-table th, table.print-table td {
+      border: 1px solid #999;
+      padding: 5px 7px;
+      text-align: left;
+    }
+
+    table.print-table th {
+      background: #eee;
+    }
+
+    table.print-table tr { page-break-inside: avoid; }
+
+    .print-footer {
+      margin-top: 20px;
+      font-size: 0.72rem;
+      color: #555;
+      border-top: 1px solid #999;
+      padding-top: 6px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -498,7 +591,13 @@
     </section>
 
     <section class="panel">
-      <h3 class="panel-title">Subscriptions</h3>
+      <h3 class="panel-title">
+        Subscriptions
+        <span class="toggle-group">
+          <button type="button" class="toggle-btn" id="printBtn">Print</button>
+          <button type="button" class="toggle-btn" id="exportBtn">Export CSV</button>
+        </span>
+      </h3>
       <table id="subTable">
         <thead>
           <tr>
@@ -522,6 +621,8 @@
 <footer class="app-footer">
   App 109 of AppADay &middot; <a class="backlink" href="https://augustineiacopelli.github.io/appaday/">https://augustineiacopelli.github.io/appaday/</a>
 </footer>
+
+<div id="printReport" aria-hidden="true"></div>
 
 <script>
 (function () {
@@ -1338,10 +1439,168 @@
     }
   }
 
+  function escapeCSVField(v) {
+    var s = v === null || v === undefined ? '' : String(v);
+    if (/[",\n]/.test(s)) {
+      s = '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  function todayStamp() {
+    var d = new Date();
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + mm + '-' + dd;
+  }
+
+  function exportCSV() {
+    var rows = [['Name', 'Cost', 'Frequency', 'Monthly Equivalent', 'Renewal Date', 'Category']];
+    var list = sortedSubs();
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i];
+      rows.push([
+        s.name,
+        s.cost.toFixed(2),
+        s.frequency,
+        normalizeToMonthly(s.cost, s.frequency).toFixed(2),
+        s.renewalDate,
+        s.category
+      ]);
+    }
+    var csvContent = rows.map(function (r) {
+      return r.map(escapeCSVField).join(',');
+    }).join('\r\n');
+
+    try {
+      var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'subscriptions-' + todayStamp() + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {
+      /* export unavailable in this browser context, silently no-op */
+    }
+  }
+
+  function buildPrintReport() {
+    var wrap = document.getElementById('printReport');
+    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+
+    var list = sortedSubs();
+    var totalMonthly = 0;
+    var soon = 0;
+    var catTotals = {};
+
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i];
+      var monthly = normalizeToMonthly(s.cost, s.frequency);
+      totalMonthly += monthly;
+      if (daysUntil(s.renewalDate) >= 0 && daysUntil(s.renewalDate) <= 7) soon++;
+      catTotals[s.category] = (catTotals[s.category] || 0) + monthly;
+    }
+
+    var titleRow = document.createElement('div');
+    titleRow.className = 'print-title-row';
+    var h1 = document.createElement('h1');
+    h1.textContent = 'Subscription Report';
+    var dateEl = document.createElement('div');
+    dateEl.className = 'print-date';
+    dateEl.textContent = 'Generated ' + new Date().toLocaleDateString();
+    titleRow.appendChild(h1);
+    titleRow.appendChild(dateEl);
+    wrap.appendChild(titleRow);
+
+    var summary = document.createElement('div');
+    summary.className = 'print-summary';
+    var stats = [
+      ['Monthly Spend', fmtMoney(totalMonthly)],
+      ['Yearly Spend', fmtMoney(totalMonthly * 12)],
+      ['Active Subscriptions', String(list.length)],
+      ['Renewing Within 7 Days', String(soon)]
+    ];
+    for (var st = 0; st < stats.length; st++) {
+      var box = document.createElement('div');
+      var label = document.createElement('span');
+      label.className = 'print-stat-label';
+      label.textContent = stats[st][0];
+      box.appendChild(label);
+      box.appendChild(document.createTextNode(stats[st][1]));
+      summary.appendChild(box);
+    }
+    wrap.appendChild(summary);
+
+    var listTitle = document.createElement('div');
+    listTitle.className = 'print-section-title';
+    listTitle.textContent = 'All Subscriptions';
+    wrap.appendChild(listTitle);
+
+    var table = document.createElement('table');
+    table.className = 'print-table';
+    var thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Service</th><th>Category</th><th>Frequency</th><th>Monthly Equiv.</th><th>Next Renewal</th></tr>';
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    for (var j = 0; j < list.length; j++) {
+      var row = list[j];
+      var tr = document.createElement('tr');
+      var cells = [row.name, row.category, row.frequency, fmtMoney(normalizeToMonthly(row.cost, row.frequency)), row.renewalDate || '\u2014'];
+      for (var cc = 0; cc < cells.length; cc++) {
+        var td = document.createElement('td');
+        td.textContent = cells[cc];
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+
+    var catTitle = document.createElement('div');
+    catTitle.className = 'print-section-title';
+    catTitle.textContent = 'By Category';
+    wrap.appendChild(catTitle);
+
+    var catTable = document.createElement('table');
+    catTable.className = 'print-table';
+    var catHead = document.createElement('thead');
+    catHead.innerHTML = '<tr><th>Category</th><th>Monthly</th></tr>';
+    catTable.appendChild(catHead);
+    var catBody = document.createElement('tbody');
+    var catKeys = Object.keys(catTotals).sort(function (a, b) { return catTotals[b] - catTotals[a]; });
+    for (var k = 0; k < catKeys.length; k++) {
+      var ctr = document.createElement('tr');
+      var tdCat = document.createElement('td');
+      tdCat.textContent = catKeys[k];
+      var tdAmt = document.createElement('td');
+      tdAmt.textContent = fmtMoney(catTotals[catKeys[k]]);
+      ctr.appendChild(tdCat);
+      ctr.appendChild(tdAmt);
+      catBody.appendChild(ctr);
+    }
+    catTable.appendChild(catBody);
+    wrap.appendChild(catTable);
+
+    var footer = document.createElement('div');
+    footer.className = 'print-footer';
+    footer.textContent = 'AppADay 109 \u2014 Subscription Creep Tracker';
+    wrap.appendChild(footer);
+  }
+
+  function handlePrint() {
+    buildPrintReport();
+    window.print();
+  }
+
   function initEvents() {
     document.getElementById('subForm').addEventListener('submit', handleSubmit);
     document.getElementById('cancelBtn').addEventListener('click', resetForm);
     document.getElementById('scanBtn').addEventListener('click', handleScanClick);
+    document.getElementById('printBtn').addEventListener('click', handlePrint);
+    document.getElementById('exportBtn').addEventListener('click', exportCSV);
 
     document.getElementById('toggleCategory').addEventListener('click', function () {
       chartMode = 'category';
