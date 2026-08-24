@@ -9,6 +9,7 @@ Tracks recurring subscriptions and normalizes every one of them to a single mont
 ## Features
 
 - Add, edit, and delete subscriptions with name, cost, billing frequency, renewal date, and category
+- Smart statement scan: upload a CSV export or paste transaction lines, and the app groups charges by merchant, checks amount consistency and billing interval, and flags likely recurring subscriptions for one-tap add. Recognizes ~35 common subscription services by name (Netflix, Spotify, Adobe, and others) even from a single charge; unrecognized merchants need at least two consistent, recently active charges to surface. Entirely client-side, nothing is uploaded anywhere
 - Every cost is normalized to a monthly equivalent through a single conversion function, so totals and comparisons are always apples to apples
 - Summary strip showing total monthly and yearly spend, active subscription count, and anything renewing within 7 days
 - Chart.js bar chart that toggles between spend by category and spend by individual service
