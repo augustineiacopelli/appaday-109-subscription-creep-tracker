@@ -16,6 +16,7 @@ Tracks recurring subscriptions and normalizes every one of them to a single mont
 - Sortable subscription list, click any column header to sort by name, monthly cost, or renewal date
 - Renewal-soon flagging highlights any subscription due within a week
 - Two-tap delete confirmation on each row, no browser confirm dialogs
+- Print a formatted report (summary stats, full subscription table, category breakdown) straight to the browser's print dialog, or export the current list as a CSV
 - Data persists locally in the browser, nothing leaves the device
 
 ## Tech
