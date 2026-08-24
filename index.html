@@ -560,7 +560,7 @@
     { match: 'GITHUB', name: 'GitHub', category: 'Software' },
     { match: 'NOTION', name: 'Notion', category: 'Software' },
     { match: 'ICLOUD', name: 'iCloud', category: 'Software' },
-    { match: 'APPLE.COM/BILL', name: 'Apple', category: 'Software' },
+    { match: 'APPLE', name: 'Apple', category: 'Software' },
     { match: 'CANVA', name: 'Canva', category: 'Software' },
     { match: 'LINKEDIN', name: 'LinkedIn Premium', category: 'Software' },
     { match: 'NYTIMES', name: 'NY Times', category: 'News & Media' },
@@ -938,53 +938,122 @@
     return Math.abs(n);
   }
 
+  function decodeEntities(s) {
+    return s
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+  }
+
+  function looksLikeHeader(cols) {
+    var joined = cols.join(' ').toLowerCase();
+    var hasDate = joined.indexOf('date') !== -1;
+    var hasAmountish = joined.indexOf('amount') !== -1 || joined.indexOf('debit') !== -1 || joined.indexOf('credit') !== -1;
+    var hasDescish = joined.indexOf('desc') !== -1 || joined.indexOf('payee') !== -1 || joined.indexOf('merchant') !== -1 || joined.indexOf('memo') !== -1;
+    return hasDate && (hasAmountish || hasDescish);
+  }
+
+  function detectHeaderMap(cols) {
+    var map = { dateIdx: -1, descIdx: -1, debitIdx: -1, creditIdx: -1, amountIdx: -1, balanceIdx: -1 };
+    for (var i = 0; i < cols.length; i++) {
+      var h = cols[i].toLowerCase();
+      if (map.balanceIdx === -1 && h.indexOf('balance') !== -1) { continue; }
+      if (map.dateIdx === -1 && h.indexOf('date') !== -1) { map.dateIdx = i; continue; }
+      if (map.debitIdx === -1 && h.indexOf('debit') !== -1) { map.debitIdx = i; continue; }
+      if (map.creditIdx === -1 && h.indexOf('credit') !== -1) { map.creditIdx = i; continue; }
+      if (map.amountIdx === -1 && (h.indexOf('amount') !== -1 || h === 'value')) { map.amountIdx = i; continue; }
+      if (map.descIdx === -1 && (h.indexOf('desc') !== -1 || h.indexOf('payee') !== -1 || h.indexOf('merchant') !== -1 || h.indexOf('memo') !== -1 || (h.indexOf('name') !== -1 && h.indexOf('account') === -1))) { map.descIdx = i; continue; }
+    }
+    for (var j = 0; j < cols.length; j++) {
+      var hj = cols[j].toLowerCase();
+      if (hj.indexOf('balance') !== -1) { map.balanceIdx = j; }
+    }
+    return map;
+  }
+
   function parseStatementText(text) {
     var lines = text.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(function (l) { return l.length; });
+    if (!lines.length) return [];
+
+    var delim = lines[0].indexOf('\t') !== -1 ? '\t' : (lines[0].indexOf(',') !== -1 ? ',' : null);
+    var headerMap = null;
+    var startIdx = 0;
+
+    if (delim) {
+      var firstCols = splitCSVLine(lines[0], delim);
+      if (looksLikeHeader(firstCols)) {
+        headerMap = detectHeaderMap(firstCols);
+        startIdx = 1;
+      }
+    }
+
     var transactions = [];
 
-    for (var i = 0; i < lines.length; i++) {
+    for (var i = startIdx; i < lines.length; i++) {
       var line = lines[i];
-      var lower = line.toLowerCase();
-      if (i === 0 && lower.indexOf('date') !== -1 && (lower.indexOf('amount') !== -1 || lower.indexOf('desc') !== -1)) {
-        continue;
-      }
+      var date = null, amount = null, desc = null, skipRow = false;
 
-      var delim = line.indexOf('\t') !== -1 ? '\t' : (line.indexOf(',') !== -1 ? ',' : null);
-      var date = null, amount = null, desc = null;
-
-      if (delim) {
+      if (delim && headerMap && (headerMap.dateIdx !== -1 || headerMap.descIdx !== -1)) {
         var cols = splitCSVLine(line, delim);
+
+        if (headerMap.dateIdx !== -1 && cols[headerMap.dateIdx]) {
+          date = parseDateToken(cols[headerMap.dateIdx]);
+        }
+        if (headerMap.descIdx !== -1 && cols[headerMap.descIdx]) {
+          desc = decodeEntities(cols[headerMap.descIdx]);
+        }
+
+        if (headerMap.debitIdx !== -1 || headerMap.creditIdx !== -1) {
+          var debitVal = headerMap.debitIdx !== -1 ? parseAmountToken(cols[headerMap.debitIdx]) : null;
+          if (debitVal !== null) {
+            amount = debitVal;
+          } else {
+            skipRow = true;
+          }
+        } else if (headerMap.amountIdx !== -1) {
+          amount = parseAmountToken(cols[headerMap.amountIdx]);
+        }
+      } else if (delim) {
+        var cols2 = splitCSVLine(line, delim);
         var descParts = [];
-        for (var c = 0; c < cols.length; c++) {
-          var col = cols[c];
+        var amountCandidates = [];
+        for (var c = 0; c < cols2.length; c++) {
+          var col = cols2[c];
           if (!date) {
             var d = parseDateToken(col);
             if (d) { date = d; continue; }
           }
           var a = parseAmountToken(col);
-          if (a !== null && /[0-9]\.\d{2}$|^\$/.test(col.replace(/,/g, ''))) {
-            amount = a;
+          if (a !== null && /\d\.\d{2}$/.test(col.replace(/,/g, ''))) {
+            amountCandidates.push(a);
             continue;
           }
           if (col) descParts.push(col);
         }
-        desc = descParts.join(' ').trim();
+        desc = decodeEntities(descParts.join(' ').trim());
+        if (amountCandidates.length) amount = amountCandidates[0];
       }
 
-      if (!date || amount === null || !desc) {
+      if (!skipRow && (!date || amount === null || !desc)) {
         var dateMatch = line.match(/(\d{4}-\d{2}-\d{2})|(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
         var amountMatches = line.match(/-?\$?\d{1,6}(?:,\d{3})*\.\d{2}/g);
-        if (dateMatch) date = parseDateToken(dateMatch[0]);
-        if (amountMatches && amountMatches.length) {
+        if (!date && dateMatch) date = parseDateToken(dateMatch[0]);
+        if (amount === null && amountMatches && amountMatches.length) {
           amount = parseAmountToken(amountMatches[amountMatches.length - 1]);
         }
-        var stripped = line;
-        if (dateMatch) stripped = stripped.replace(dateMatch[0], '');
-        if (amountMatches && amountMatches.length) stripped = stripped.replace(amountMatches[amountMatches.length - 1], '');
-        desc = stripped.replace(/[,\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!desc) {
+          var stripped = line;
+          if (dateMatch) stripped = stripped.replace(dateMatch[0], '');
+          if (amountMatches && amountMatches.length) {
+            stripped = stripped.replace(amountMatches[amountMatches.length - 1], '');
+          }
+          desc = decodeEntities(stripped.replace(/[,\t]+/g, ' ').replace(/\s+/g, ' ').trim());
+        }
       }
 
-      if (date && amount !== null && desc) {
+      if (!skipRow && date && amount !== null && desc) {
         transactions.push({ date: date, amount: amount, desc: desc });
       }
     }
@@ -992,29 +1061,53 @@
     return transactions;
   }
 
+  var STATE_ABBR = /^(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)$/;
+  var NOISE_WORDS = /^(POS|REF|DEBIT|PURCHASE|PAYMENT|AUTOPAY|RECURRING|CARD|ORIG|WEB|ID|CO|INC|LLC)$/;
+
   function normalizeMerchant(desc) {
-    var s = desc.toUpperCase();
-    s = s.replace(/\d{4,}/g, '');
-    s = s.replace(/\b(POS|REF|DEBIT|PURCHASE|PAYMENT|AUTOPAY|RECURRING|CARD|XX+\d*)\b/g, '');
-    s = s.replace(/[#*]+/g, ' ');
-    s = s.replace(/\s+/g, ' ').trim();
-    return s.slice(0, 40);
+    var s = desc.toUpperCase().replace(/[#*]+/g, ' ');
+    var words = s.split(/\s+/).filter(function (w) {
+      if (!w) return false;
+      if (/^\d{3,}$/.test(w)) return false;
+      if (/^X+\d*$/.test(w)) return false;
+      if (NOISE_WORDS.test(w)) return false;
+      if (w.length >= 6 && /^[A-Z0-9]+$/.test(w) && /[0-9]/.test(w) && /[A-Z]/.test(w)) return false;
+      return true;
+    });
+    if (words.length > 1 && STATE_ABBR.test(words[words.length - 1])) {
+      words.pop();
+    }
+    return words.join(' ').replace(/\s+/g, ' ').trim().slice(0, 40);
   }
 
   function findKnownSub(merchantUpper) {
     for (var i = 0; i < KNOWN_SUBS.length; i++) {
-      if (merchantUpper.indexOf(KNOWN_SUBS[i].match) !== -1) return KNOWN_SUBS[i];
+      var m = KNOWN_SUBS[i].match;
+      var idx = merchantUpper.indexOf(m);
+      while (idx !== -1) {
+        var before = idx === 0 ? '' : merchantUpper.charAt(idx - 1);
+        var afterIdx = idx + m.length;
+        var after = afterIdx >= merchantUpper.length ? '' : merchantUpper.charAt(afterIdx);
+        var beforeOk = !before || !/[A-Z0-9]/.test(before);
+        var afterOk = !after || !/[A-Z0-9]/.test(after);
+        if (beforeOk && afterOk) return KNOWN_SUBS[i];
+        idx = merchantUpper.indexOf(m, idx + 1);
+      }
     }
     return null;
+  }
+
+  function daysBetween(dateA, dateB) {
+    var a = new Date(dateA + 'T00:00:00');
+    var b = new Date(dateB + 'T00:00:00');
+    return Math.round((b - a) / 86400000);
   }
 
   function guessFrequency(sortedDates) {
     if (sortedDates.length < 2) return 'monthly';
     var intervals = [];
     for (var i = 1; i < sortedDates.length; i++) {
-      var a = new Date(sortedDates[i - 1] + 'T00:00:00');
-      var b = new Date(sortedDates[i] + 'T00:00:00');
-      intervals.push(Math.round((b - a) / 86400000));
+      intervals.push(daysBetween(sortedDates[i - 1], sortedDates[i]));
     }
     intervals.sort(function (x, y) { return x - y; });
     var median = intervals[Math.floor(intervals.length / 2)];
@@ -1025,7 +1118,20 @@
     return null;
   }
 
+  var RECENCY_WINDOW_DAYS = 60;
+
+  function titleCase(s) {
+    return s.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
   function detectCandidates(transactions) {
+    if (!transactions.length) return [];
+
+    var maxDate = transactions[0].date;
+    for (var t = 1; t < transactions.length; t++) {
+      if (transactions[t].date > maxDate) maxDate = transactions[t].date;
+    }
+
     var groups = {};
     for (var i = 0; i < transactions.length; i++) {
       var tx = transactions[i];
@@ -1046,19 +1152,21 @@
       var stableAmount = avg > 0 ? (maxDelta / avg) <= 0.15 : false;
       var known = findKnownSub(key);
       var dates = txs.map(function (t) { return t.date; });
+      var lastDate = dates[dates.length - 1];
+      var isRecent = daysBetween(lastDate, maxDate) <= RECENCY_WINDOW_DAYS;
 
       var include = false;
       var confidence = 'medium';
       var frequency = null;
 
-      if (txs.length >= 2 && stableAmount) {
+      if (isRecent && txs.length >= 2 && stableAmount) {
         frequency = guessFrequency(dates);
         if (frequency) {
           include = true;
           confidence = known ? 'high' : 'medium';
         }
       }
-      if (!include && known && txs.length >= 1) {
+      if (!include && isRecent && known && txs.length >= 1) {
         include = true;
         confidence = 'high';
         frequency = frequency || 'monthly';
@@ -1067,13 +1175,13 @@
       if (include) {
         results.push({
           key: key,
-          name: known ? known.name : (key.charAt(0) + key.slice(1).toLowerCase()),
+          name: known ? known.name : titleCase(key),
           cost: Math.round(avg * 100) / 100,
           frequency: frequency,
           category: known ? known.category : 'Other',
           confidence: confidence,
           occurrences: txs.length,
-          lastDate: dates[dates.length - 1]
+          lastDate: lastDate
         });
       }
     }
