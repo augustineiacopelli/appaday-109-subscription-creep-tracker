@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subscription Creep Tracker | AppADay 109</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #16241C;
+    --surface: #1F3327;
+    --surface-raised: #274032;
+    --line: #35543F;
+    --ink: #EDEAD9;
+    --ink-muted: #9FB3A0;
+    --brass: #C9A227;
+    --brass-soft: #8C7420;
+    --rust: #E4572E;
+    --rust-soft: #3A241C;
+    --font-display: 'Fraunces', serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 8% 0%, rgba(201,162,39,0.08), transparent 45%),
+      radial-gradient(circle at 100% 100%, rgba(201,162,39,0.05), transparent 40%);
+    color: var(--ink);
+    font-family: var(--font-body);
+    display: flex;
+    flex-direction: column;
+  }
+
+  a { color: var(--brass); }
+
+  header.app-header {
+    padding: 18px 20px 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    position: relative;
+  }
+
+  .vine {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 140px;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .title-block { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+  .app-num {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--brass);
+    letter-spacing: 0.08em;
+    border: 1px solid var(--brass-soft);
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+
+  .backlink {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    text-decoration: none;
+    color: var(--ink-muted);
+    border-bottom: 1px dotted var(--ink-muted);
+  }
+  .backlink:hover { color: var(--brass); border-color: var(--brass); }
+
+  main { flex: 1; padding: 20px; max-width: 1100px; width: 100%; margin: 0 auto; }
+
+  .summary-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .summary-label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-muted);
+    margin-bottom: 6px;
+  }
+
+  .summary-value {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--brass);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .summary-value.warn { color: var(--rust); }
+  .summary-sub { font-size: 0.75rem; color: var(--ink-muted); margin-top: 3px; }
+
+  section.panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+
+  .panel-title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  form#subForm {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    align-items: end;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; grid-column: span 2; }
+  .field.full { grid-column: span 6; }
+
+  label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-muted);
+  }
+
+  input, select {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 0.92rem;
+    padding: 9px 10px;
+    border-radius: 6px;
+    width: 100%;
+  }
+  input:focus, select:focus, button:focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 1px;
+  }
+
+  .form-actions { display: flex; gap: 8px; grid-column: span 2; }
+
+  button {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.88rem;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+
+  .btn-primary { background: var(--brass); color: #16241C; flex: 1; }
+  .btn-primary:hover { background: #DDB53A; }
+
+  .btn-secondary { background: transparent; border: 1px solid var(--line); color: var(--ink-muted); }
+  .btn-secondary:hover { color: var(--ink); border-color: var(--ink-muted); }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: 18px;
+  }
+
+  .scan-privacy {
+    font-size: 0.76rem;
+    color: var(--ink-muted);
+    margin: -2px 0 14px;
+  }
+
+  .scan-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .scan-drop {
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .scan-drop input[type="file"] {
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+  }
+
+  textarea#pasteInput {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    border-radius: 6px;
+    padding: 10px;
+    resize: vertical;
+    min-height: 90px;
+    width: 100%;
+  }
+
+  .scan-status {
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    min-height: 1.1em;
+  }
+
+  .candidate-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .candidate-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .candidate-card.added { opacity: 0.45; }
+
+  .candidate-main { display: flex; flex-direction: column; gap: 3px; }
+  .candidate-name { font-weight: 600; font-size: 0.92rem; }
+  .candidate-meta { font-size: 0.76rem; color: var(--ink-muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .candidate-cost { font-family: var(--font-mono); color: var(--brass); }
+
+  .confidence-badge {
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--brass-soft);
+    color: var(--brass);
+  }
+  .confidence-badge.medium { border-color: var(--line); color: var(--ink-muted); }
+
+  .candidate-actions { display: flex; gap: 6px; }
+
+  @media (max-width: 700px) {
+    .scan-inputs { grid-template-columns: 1fr; }
+  }
+
+  .toggle-group { display: flex; gap: 4px; }
+  .toggle-btn {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink-muted);
+    font-size: 0.72rem;
+    padding: 5px 10px;
+  }
+  .toggle-btn.active { background: var(--brass-soft); color: var(--ink); border-color: var(--brass); }
+
+  .chart-wrap { position: relative; height: 260px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+
+  th {
+    text-align: left;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  th.sorted { color: var(--brass); }
+  th .arrow { font-size: 0.6rem; margin-left: 3px; }
+
+  td {
+    padding: 9px 8px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+
+  tr.renewal-soon td:first-child { position: relative; }
+  .soon-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--rust);
+    margin-right: 6px;
+  }
+
+  .cost-cell { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--brass); }
+  .cat-pill {
+    font-size: 0.68rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--ink-muted);
+    white-space: nowrap;
+  }
+
+  .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .row-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-muted);
+    font-size: 0.7rem;
+    padding: 5px 8px;
+  }
+  .row-btn:hover { color: var(--ink); }
+  .row-btn.delete-confirm { background: var(--rust-soft); border-color: var(--rust); color: var(--rust); }
+
+  .empty-state {
+    text-align: center;
+    padding: 30px 10px;
+    color: var(--ink-muted);
+    font-size: 0.88rem;
+  }
+
+  footer.app-footer {
+    text-align: center;
+    padding: 18px;
+    border-top: 1px solid var(--line);
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+  }
+
+  @media (max-width: 700px) {
+    .summary-strip { grid-template-columns: 1fr; }
+    form#subForm { grid-template-columns: 1fr 1fr; }
+    .field.full, .form-actions { grid-column: span 2; }
+    .content-grid { grid-template-columns: 1fr; }
+    table { display: block; overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <svg class="vine" viewBox="0 0 140 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M130 0 C 90 40, 110 80, 70 110 C 40 135, 60 165, 30 200" stroke="#C9A227" stroke-width="2" fill="none" opacity="0.6"/>
+    <circle cx="90" cy="40" r="4" fill="#C9A227"/>
+    <circle cx="70" cy="110" r="3" fill="#C9A227"/>
+    <circle cx="60" cy="165" r="4" fill="#C9A227"/>
+    <circle cx="110" cy="80" r="2.5" fill="#C9A227"/>
+  </svg>
+  <div class="title-block">
+    <span class="app-num">109</span>
+    <h1>Subscription Creep Tracker</h1>
+  </div>
+  <a class="backlink" href="https://augustineiacopelli.github.io/appaday/">&larr; AppADay Portfolio</a>
+</header>
+
+<main>
+
+  <section class="summary-strip">
+    <div class="summary-card">
+      <div class="summary-label">Monthly Equivalent Spend</div>
+      <div class="summary-value" id="totalMonthly">$0.00</div>
+      <div class="summary-sub" id="totalYearly">$0.00 / year</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Active Subscriptions</div>
+      <div class="summary-value" id="totalCount">0</div>
+      <div class="summary-sub" id="avgCost">avg $0.00 / mo each</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Renewing Within 7 Days</div>
+      <div class="summary-value" id="soonCount">0</div>
+      <div class="summary-sub" id="nextRenewal">no upcoming renewals</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title" id="formTitle">Add a Subscription</h3>
+    <form id="subForm">
+      <input type="hidden" id="editId" value="">
+      <div class="field full">
+        <label for="name">Service Name</label>
+        <input type="text" id="name" placeholder="Netflix, Spotify, Adobe..." required maxlength="60">
+      </div>
+      <div class="field">
+        <label for="cost">Cost</label>
+        <input type="number" id="cost" min="0" step="0.01" placeholder="0.00" required>
+      </div>
+      <div class="field">
+        <label for="frequency">Frequency</label>
+        <select id="frequency">
+          <option value="weekly">Weekly</option>
+          <option value="monthly" selected>Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="renewalDate">Next Renewal</label>
+        <input type="date" id="renewalDate" required>
+      </div>
+      <div class="field">
+        <label for="category">Category</label>
+        <select id="category">
+          <option>Entertainment</option>
+          <option>Software</option>
+          <option>Fitness</option>
+          <option>News &amp; Media</option>
+          <option>Shopping</option>
+          <option>Utilities</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn-primary" id="submitBtn">Add</button>
+        <button type="button" class="btn-secondary" id="cancelBtn" style="display:none;">Cancel</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Find Subscriptions From a Statement</h3>
+    <p class="scan-privacy">Everything here is parsed in your browser. Nothing is uploaded anywhere.</p>
+    <div class="scan-inputs">
+      <div class="scan-drop">
+        <label for="csvFile">CSV file (bank or card export)</label>
+        <input type="file" id="csvFile" accept=".csv,.txt">
+      </div>
+      <div>
+        <label for="pasteInput">Or paste transaction lines</label>
+        <textarea id="pasteInput" placeholder="2026-08-01, NETFLIX.COM, 15.49&#10;2026-07-02, NETFLIX.COM, 15.49&#10;2026-07-15, SPOTIFY USA, 11.99"></textarea>
+      </div>
+    </div>
+    <button type="button" class="btn-primary" id="scanBtn" style="margin-bottom:12px;">Scan for Subscriptions</button>
+    <div class="scan-status" id="scanStatus"></div>
+    <div class="candidate-list" id="candidateList"></div>
+  </section>
+
+  <div class="content-grid">
+    <section class="panel">
+      <h3 class="panel-title">
+        By Spend
+        <span class="toggle-group">
+          <button type="button" class="toggle-btn active" id="toggleCategory">Category</button>
+          <button type="button" class="toggle-btn" id="toggleService">Service</button>
+        </span>
+      </h3>
+      <div class="chart-wrap">
+        <canvas id="spendChart"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3 class="panel-title">Subscriptions</h3>
+      <table id="subTable">
+        <thead>
+          <tr>
+            <th data-sort="name">Name<span class="arrow"></span></th>
+            <th data-sort="cost">Monthly<span class="arrow"></span></th>
+            <th data-sort="renewalDate">Renews<span class="arrow"></span></th>
+            <th>Category</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="subTableBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">
+        No subscriptions yet. Add one above to see where the creep is coming from.
+      </div>
+    </section>
+  </div>
+
+</main>
+
+<footer class="app-footer">
+  App 109 of AppADay &middot; <a class="backlink" href="https://augustineiacopelli.github.io/appaday/">https://augustineiacopelli.github.io/appaday/</a>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORAGE_KEY = 'appaday109-subscriptions';
+  var subs = [];
+  var sortState = { key: 'renewalDate', dir: 'asc' };
+  var chartMode = 'category';
+  var confirmingId = null;
+  var chartInstance = null;
+  var candidates = [];
+
+  var KNOWN_SUBS = [
+    { match: 'NETFLIX', name: 'Netflix', category: 'Entertainment' },
+    { match: 'SPOTIFY', name: 'Spotify', category: 'Entertainment' },
+    { match: 'HULU', name: 'Hulu', category: 'Entertainment' },
+    { match: 'DISNEY PLUS', name: 'Disney Plus', category: 'Entertainment' },
+    { match: 'DISNEYPLUS', name: 'Disney Plus', category: 'Entertainment' },
+    { match: 'HBO', name: 'HBO Max', category: 'Entertainment' },
+    { match: 'MAX.COM', name: 'Max', category: 'Entertainment' },
+    { match: 'PARAMOUNT', name: 'Paramount Plus', category: 'Entertainment' },
+    { match: 'PEACOCK', name: 'Peacock', category: 'Entertainment' },
+    { match: 'YOUTUBE PREMIUM', name: 'YouTube Premium', category: 'Entertainment' },
+    { match: 'YOUTUBETV', name: 'YouTube TV', category: 'Entertainment' },
+    { match: 'AUDIBLE', name: 'Audible', category: 'Entertainment' },
+    { match: 'AMAZON PRIME', name: 'Amazon Prime', category: 'Shopping' },
+    { match: 'PRIME VIDEO', name: 'Prime Video', category: 'Entertainment' },
+    { match: 'XBOX', name: 'Xbox Game Pass', category: 'Entertainment' },
+    { match: 'PLAYSTATION', name: 'PlayStation Plus', category: 'Entertainment' },
+    { match: 'ADOBE', name: 'Adobe', category: 'Software' },
+    { match: 'MICROSOFT', name: 'Microsoft 365', category: 'Software' },
+    { match: 'DROPBOX', name: 'Dropbox', category: 'Software' },
+    { match: 'GOOGLE ONE', name: 'Google One', category: 'Software' },
+    { match: 'GOOGLE STORAGE', name: 'Google Storage', category: 'Software' },
+    { match: 'GITHUB', name: 'GitHub', category: 'Software' },
+    { match: 'NOTION', name: 'Notion', category: 'Software' },
+    { match: 'ICLOUD', name: 'iCloud', category: 'Software' },
+    { match: 'APPLE.COM/BILL', name: 'Apple', category: 'Software' },
+    { match: 'CANVA', name: 'Canva', category: 'Software' },
+    { match: 'LINKEDIN', name: 'LinkedIn Premium', category: 'Software' },
+    { match: 'NYTIMES', name: 'NY Times', category: 'News & Media' },
+    { match: 'NEW YORK TIMES', name: 'NY Times', category: 'News & Media' },
+    { match: 'WSJ', name: 'Wall Street Journal', category: 'News & Media' },
+    { match: 'WALL STREET JOURNAL', name: 'Wall Street Journal', category: 'News & Media' },
+    { match: 'MEDIUM.COM', name: 'Medium', category: 'News & Media' },
+    { match: 'PLANET FITNESS', name: 'Planet Fitness', category: 'Fitness' },
+    { match: 'PELOTON', name: 'Peloton', category: 'Fitness' },
+    { match: 'CLASSPASS', name: 'ClassPass', category: 'Fitness' }
+  ];
+
+  function normalizeToMonthly(cost, frequency) {
+    var c = Number(cost) || 0;
+    if (frequency === 'weekly') return c * 52 / 12;
+    if (frequency === 'quarterly') return c * 4 / 12;
+    if (frequency === 'yearly') return c / 12;
+    return c;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveData() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));
+    } catch (e) {
+      /* storage unavailable, silently continue in-memory */
+    }
+  }
+
+  function uid() {
+    return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  function fmtMoney(n) {
+    return '$' + n.toFixed(2);
+  }
+
+  function daysUntil(dateStr) {
+    if (!dateStr) return Infinity;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var target = new Date(dateStr + 'T00:00:00');
+    return Math.round((target - today) / 86400000);
+  }
+
+  function renderSummary() {
+    var totalMonthly = 0;
+    var soon = 0;
+    var nextDays = Infinity;
+    var nextName = '';
+
+    for (var i = 0; i < subs.length; i++) {
+      var s = subs[i];
+      totalMonthly += normalizeToMonthly(s.cost, s.frequency);
+      var d = daysUntil(s.renewalDate);
+      if (d >= 0 && d <= 7) soon++;
+      if (d >= 0 && d < nextDays) {
+        nextDays = d;
+        nextName = s.name;
+      }
+    }
+
+    document.getElementById('totalMonthly').textContent = fmtMoney(totalMonthly);
+    document.getElementById('totalYearly').textContent = fmtMoney(totalMonthly * 12) + ' / year';
+    document.getElementById('totalCount').textContent = String(subs.length);
+    document.getElementById('avgCost').textContent =
+      'avg ' + fmtMoney(subs.length ? totalMonthly / subs.length : 0) + ' / mo each';
+
+    var soonEl = document.getElementById('soonCount');
+    soonEl.textContent = String(soon);
+    soonEl.className = 'summary-value' + (soon > 0 ? ' warn' : '');
+
+    var nextEl = document.getElementById('nextRenewal');
+    if (nextName) {
+      nextEl.textContent = nextName + ' in ' + nextDays + (nextDays === 1 ? ' day' : ' days');
+    } else {
+      nextEl.textContent = 'no upcoming renewals';
+    }
+  }
+
+  function aggregate(mode) {
+    var buckets = {};
+    for (var i = 0; i < subs.length; i++) {
+      var s = subs[i];
+      var key = mode === 'service' ? s.name : s.category;
+      var val = normalizeToMonthly(s.cost, s.frequency);
+      buckets[key] = (buckets[key] || 0) + val;
+    }
+    var labels = Object.keys(buckets).sort(function (a, b) {
+      return buckets[b] - buckets[a];
+    });
+    var data = labels.map(function (l) { return Math.round(buckets[l] * 100) / 100; });
+    return { labels: labels, data: data };
+  }
+
+  function renderChart() {
+    var agg = aggregate(chartMode);
+    var canvas = document.getElementById('spendChart');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    if (chartInstance) {
+      chartInstance.destroy();
+    }
+
+    chartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: agg.labels.length ? agg.labels : ['No data'],
+        datasets: [{
+          label: 'Monthly $',
+          data: agg.data.length ? agg.data : [0],
+          backgroundColor: '#C9A227',
+          borderRadius: 4,
+          maxBarThickness: 40
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#9FB3A0', callback: function (v) { return '$' + v; } },
+            grid: { color: '#35543F' }
+          },
+          x: {
+            ticks: { color: '#9FB3A0' },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  }
+
+  function sortedSubs() {
+    var arr = subs.slice();
+    var key = sortState.key;
+    var dir = sortState.dir === 'asc' ? 1 : -1;
+    arr.sort(function (a, b) {
+      var av, bv;
+      if (key === 'cost') {
+        av = normalizeToMonthly(a.cost, a.frequency);
+        bv = normalizeToMonthly(b.cost, b.frequency);
+      } else if (key === 'renewalDate') {
+        av = a.renewalDate || '';
+        bv = b.renewalDate || '';
+      } else {
+        av = (a.name || '').toLowerCase();
+        bv = (b.name || '').toLowerCase();
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+    return arr;
+  }
+
+  function renderList() {
+    var tbody = document.getElementById('subTableBody');
+    var empty = document.getElementById('emptyState');
+    var rows = sortedSubs();
+
+    while (tbody.firstChild) {
+      tbody.removeChild(tbody.firstChild);
+    }
+
+    if (!rows.length) {
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+    }
+
+    for (var i = 0; i < rows.length; i++) {
+      var s = rows[i];
+      var monthly = normalizeToMonthly(s.cost, s.frequency);
+      var soon = daysUntil(s.renewalDate) >= 0 && daysUntil(s.renewalDate) <= 7;
+
+      var tr = document.createElement('tr');
+      if (soon) tr.classList.add('renewal-soon');
+
+      var tdName = document.createElement('td');
+      if (soon) {
+        var dot = document.createElement('span');
+        dot.className = 'soon-dot';
+        tdName.appendChild(dot);
+      }
+      tdName.appendChild(document.createTextNode(s.name));
+      tr.appendChild(tdName);
+
+      var tdCost = document.createElement('td');
+      tdCost.className = 'cost-cell';
+      tdCost.textContent = fmtMoney(monthly);
+      tr.appendChild(tdCost);
+
+      var tdDate = document.createElement('td');
+      tdDate.textContent = s.renewalDate || '\u2014';
+      tr.appendChild(tdDate);
+
+      var tdCat = document.createElement('td');
+      var pill = document.createElement('span');
+      pill.className = 'cat-pill';
+      pill.textContent = s.category;
+      tdCat.appendChild(pill);
+      tr.appendChild(tdCat);
+
+      var tdActions = document.createElement('td');
+      var actionsWrap = document.createElement('div');
+      actionsWrap.className = 'row-actions';
+
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'row-btn';
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', (function (id) {
+        return function () { startEdit(id); };
+      })(s.id));
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'row-btn';
+      if (confirmingId === s.id) {
+        delBtn.classList.add('delete-confirm');
+        delBtn.textContent = 'Confirm?';
+      } else {
+        delBtn.textContent = 'Delete';
+      }
+      delBtn.addEventListener('click', (function (id) {
+        return function () { handleDelete(id); };
+      })(s.id));
+
+      actionsWrap.appendChild(editBtn);
+      actionsWrap.appendChild(delBtn);
+      tdActions.appendChild(actionsWrap);
+      tr.appendChild(tdActions);
+
+      tbody.appendChild(tr);
+    }
+
+    var headers = document.querySelectorAll('th[data-sort]');
+    for (var h = 0; h < headers.length; h++) {
+      var th = headers[h];
+      var arrow = th.querySelector('.arrow');
+      if (th.getAttribute('data-sort') === sortState.key) {
+        th.classList.add('sorted');
+        arrow.textContent = sortState.dir === 'asc' ? '\u2191' : '\u2193';
+      } else {
+        th.classList.remove('sorted');
+        arrow.textContent = '';
+      }
+    }
+  }
+
+  function handleDelete(id) {
+    if (confirmingId === id) {
+      subs = subs.filter(function (s) { return s.id !== id; });
+      confirmingId = null;
+      saveData();
+      renderList();
+      renderChart();
+      renderSummary();
+    } else {
+      confirmingId = id;
+      renderList();
+    }
+  }
+
+  function startEdit(id) {
+    var s = subs.filter(function (x) { return x.id === id; })[0];
+    if (!s) return;
+    document.getElementById('editId').value = s.id;
+    document.getElementById('name').value = s.name;
+    document.getElementById('cost').value = s.cost;
+    document.getElementById('frequency').value = s.frequency;
+    document.getElementById('renewalDate').value = s.renewalDate;
+    document.getElementById('category').value = s.category;
+    document.getElementById('formTitle').textContent = 'Edit Subscription';
+    document.getElementById('submitBtn').textContent = 'Update';
+    document.getElementById('cancelBtn').style.display = 'inline-block';
+    document.getElementById('name').focus();
+  }
+
+  function resetForm() {
+    document.getElementById('subForm').reset();
+    document.getElementById('editId').value = '';
+    document.getElementById('frequency').value = 'monthly';
+    document.getElementById('formTitle').textContent = 'Add a Subscription';
+    document.getElementById('submitBtn').textContent = 'Add';
+    document.getElementById('cancelBtn').style.display = 'none';
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    var editId = document.getElementById('editId').value;
+    var name = document.getElementById('name').value.trim();
+    var cost = document.getElementById('cost').value;
+    var frequency = document.getElementById('frequency').value;
+    var renewalDate = document.getElementById('renewalDate').value;
+    var category = document.getElementById('category').value;
+
+    if (!name || cost === '' || !renewalDate) return;
+
+    if (editId) {
+      var idx = -1;
+      for (var i = 0; i < subs.length; i++) {
+        if (subs[i].id === editId) { idx = i; break; }
+      }
+      if (idx !== -1) {
+        subs[idx] = { id: editId, name: name, cost: Number(cost), frequency: frequency, renewalDate: renewalDate, category: category };
+      }
+    } else {
+      subs.push({ id: uid(), name: name, cost: Number(cost), frequency: frequency, renewalDate: renewalDate, category: category });
+    }
+
+    saveData();
+    resetForm();
+    renderList();
+    renderChart();
+    renderSummary();
+  }
+
+  function splitCSVLine(line, delim) {
+    var out = [];
+    var cur = '';
+    var inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+      } else if (ch === delim && !inQuotes) {
+        out.push(cur.trim());
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur.trim());
+    return out;
+  }
+
+  function parseDateToken(token) {
+    if (!token) return null;
+    var t = token.trim();
+    var iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+    var mdy = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (mdy) {
+      var mm = mdy[1].padStart(2, '0');
+      var dd = mdy[2].padStart(2, '0');
+      var yy = mdy[3].length === 2 ? '20' + mdy[3] : mdy[3];
+      return yy + '-' + mm + '-' + dd;
+    }
+    return null;
+  }
+
+  function parseAmountToken(token) {
+    if (!token) return null;
+    var cleaned = token.replace(/[^0-9.\-]/g, '');
+    if (!cleaned || cleaned === '-' || cleaned === '.') return null;
+    var n = parseFloat(cleaned);
+    if (isNaN(n)) return null;
+    return Math.abs(n);
+  }
+
+  function parseStatementText(text) {
+    var lines = text.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(function (l) { return l.length; });
+    var transactions = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var lower = line.toLowerCase();
+      if (i === 0 && lower.indexOf('date') !== -1 && (lower.indexOf('amount') !== -1 || lower.indexOf('desc') !== -1)) {
+        continue;
+      }
+
+      var delim = line.indexOf('\t') !== -1 ? '\t' : (line.indexOf(',') !== -1 ? ',' : null);
+      var date = null, amount = null, desc = null;
+
+      if (delim) {
+        var cols = splitCSVLine(line, delim);
+        var descParts = [];
+        for (var c = 0; c < cols.length; c++) {
+          var col = cols[c];
+          if (!date) {
+            var d = parseDateToken(col);
+            if (d) { date = d; continue; }
+          }
+          var a = parseAmountToken(col);
+          if (a !== null && /[0-9]\.\d{2}$|^\$/.test(col.replace(/,/g, ''))) {
+            amount = a;
+            continue;
+          }
+          if (col) descParts.push(col);
+        }
+        desc = descParts.join(' ').trim();
+      }
+
+      if (!date || amount === null || !desc) {
+        var dateMatch = line.match(/(\d{4}-\d{2}-\d{2})|(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
+        var amountMatches = line.match(/-?\$?\d{1,6}(?:,\d{3})*\.\d{2}/g);
+        if (dateMatch) date = parseDateToken(dateMatch[0]);
+        if (amountMatches && amountMatches.length) {
+          amount = parseAmountToken(amountMatches[amountMatches.length - 1]);
+        }
+        var stripped = line;
+        if (dateMatch) stripped = stripped.replace(dateMatch[0], '');
+        if (amountMatches && amountMatches.length) stripped = stripped.replace(amountMatches[amountMatches.length - 1], '');
+        desc = stripped.replace(/[,\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+      }
+
+      if (date && amount !== null && desc) {
+        transactions.push({ date: date, amount: amount, desc: desc });
+      }
+    }
+
+    return transactions;
+  }
+
+  function normalizeMerchant(desc) {
+    var s = desc.toUpperCase();
+    s = s.replace(/\d{4,}/g, '');
+    s = s.replace(/\b(POS|REF|DEBIT|PURCHASE|PAYMENT|AUTOPAY|RECURRING|CARD|XX+\d*)\b/g, '');
+    s = s.replace(/[#*]+/g, ' ');
+    s = s.replace(/\s+/g, ' ').trim();
+    return s.slice(0, 40);
+  }
+
+  function findKnownSub(merchantUpper) {
+    for (var i = 0; i < KNOWN_SUBS.length; i++) {
+      if (merchantUpper.indexOf(KNOWN_SUBS[i].match) !== -1) return KNOWN_SUBS[i];
+    }
+    return null;
+  }
+
+  function guessFrequency(sortedDates) {
+    if (sortedDates.length < 2) return 'monthly';
+    var intervals = [];
+    for (var i = 1; i < sortedDates.length; i++) {
+      var a = new Date(sortedDates[i - 1] + 'T00:00:00');
+      var b = new Date(sortedDates[i] + 'T00:00:00');
+      intervals.push(Math.round((b - a) / 86400000));
+    }
+    intervals.sort(function (x, y) { return x - y; });
+    var median = intervals[Math.floor(intervals.length / 2)];
+    if (median >= 5 && median <= 9) return 'weekly';
+    if (median >= 25 && median <= 35) return 'monthly';
+    if (median >= 80 && median <= 100) return 'quarterly';
+    if (median >= 350 && median <= 380) return 'yearly';
+    return null;
+  }
+
+  function detectCandidates(transactions) {
+    var groups = {};
+    for (var i = 0; i < transactions.length; i++) {
+      var tx = transactions[i];
+      var key = normalizeMerchant(tx.desc);
+      if (!key) continue;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(tx);
+    }
+
+    var results = [];
+    var keys = Object.keys(groups);
+    for (var k = 0; k < keys.length; k++) {
+      var key = keys[k];
+      var txs = groups[key].slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+      var amounts = txs.map(function (t) { return t.amount; });
+      var avg = amounts.reduce(function (s, v) { return s + v; }, 0) / amounts.length;
+      var maxDelta = Math.max.apply(null, amounts.map(function (v) { return Math.abs(v - avg); }));
+      var stableAmount = avg > 0 ? (maxDelta / avg) <= 0.15 : false;
+      var known = findKnownSub(key);
+      var dates = txs.map(function (t) { return t.date; });
+
+      var include = false;
+      var confidence = 'medium';
+      var frequency = null;
+
+      if (txs.length >= 2 && stableAmount) {
+        frequency = guessFrequency(dates);
+        if (frequency) {
+          include = true;
+          confidence = known ? 'high' : 'medium';
+        }
+      }
+      if (!include && known && txs.length >= 1) {
+        include = true;
+        confidence = 'high';
+        frequency = frequency || 'monthly';
+      }
+
+      if (include) {
+        results.push({
+          key: key,
+          name: known ? known.name : (key.charAt(0) + key.slice(1).toLowerCase()),
+          cost: Math.round(avg * 100) / 100,
+          frequency: frequency,
+          category: known ? known.category : 'Other',
+          confidence: confidence,
+          occurrences: txs.length,
+          lastDate: dates[dates.length - 1]
+        });
+      }
+    }
+
+    results.sort(function (a, b) {
+      if (a.confidence !== b.confidence) return a.confidence === 'high' ? -1 : 1;
+      return b.cost - a.cost;
+    });
+
+    return results;
+  }
+
+  function renderCandidates() {
+    var wrap = document.getElementById('candidateList');
+    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+
+    if (!candidates.length) return;
+
+    for (var i = 0; i < candidates.length; i++) {
+      (function (cand) {
+        var card = document.createElement('div');
+        card.className = 'candidate-card' + (cand.added ? ' added' : '');
+
+        var main = document.createElement('div');
+        main.className = 'candidate-main';
+
+        var nameEl = document.createElement('div');
+        nameEl.className = 'candidate-name';
+        nameEl.textContent = cand.name;
+        main.appendChild(nameEl);
+
+        var meta = document.createElement('div');
+        meta.className = 'candidate-meta';
+
+        var badge = document.createElement('span');
+        badge.className = 'confidence-badge' + (cand.confidence === 'medium' ? ' medium' : '');
+        badge.textContent = cand.confidence === 'high' ? 'Likely' : 'Possible';
+        meta.appendChild(badge);
+
+        var costSpan = document.createElement('span');
+        costSpan.className = 'candidate-cost';
+        costSpan.textContent = '$' + cand.cost.toFixed(2) + ' / ' + cand.frequency;
+        meta.appendChild(costSpan);
+
+        var occSpan = document.createElement('span');
+        occSpan.textContent = cand.occurrences + (cand.occurrences === 1 ? ' charge seen' : ' charges seen');
+        meta.appendChild(occSpan);
+
+        var catSpan = document.createElement('span');
+        catSpan.textContent = cand.category;
+        meta.appendChild(catSpan);
+
+        main.appendChild(meta);
+        card.appendChild(main);
+
+        var actions = document.createElement('div');
+        actions.className = 'candidate-actions';
+
+        if (!cand.added) {
+          var addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'row-btn';
+          addBtn.textContent = 'Add';
+          addBtn.addEventListener('click', function () {
+            addCandidate(cand);
+          });
+
+          var dismissBtn = document.createElement('button');
+          dismissBtn.type = 'button';
+          dismissBtn.className = 'row-btn';
+          dismissBtn.textContent = 'Dismiss';
+          dismissBtn.addEventListener('click', function () {
+            candidates = candidates.filter(function (c) { return c.key !== cand.key; });
+            renderCandidates();
+          });
+
+          actions.appendChild(addBtn);
+          actions.appendChild(dismissBtn);
+        } else {
+          var addedLabel = document.createElement('span');
+          addedLabel.className = 'candidate-meta';
+          addedLabel.textContent = 'Added';
+          actions.appendChild(addedLabel);
+        }
+
+        card.appendChild(actions);
+        wrap.appendChild(card);
+      })(candidates[i]);
+    }
+  }
+
+  function addCandidate(cand) {
+    subs.push({
+      id: uid(),
+      name: cand.name,
+      cost: cand.cost,
+      frequency: cand.frequency,
+      renewalDate: document.getElementById('renewalDate').value || cand.lastDate,
+      category: cand.category
+    });
+    cand.added = true;
+    saveData();
+    renderCandidates();
+    renderList();
+    renderChart();
+    renderSummary();
+  }
+
+  function runScan(text) {
+    var statusEl = document.getElementById('scanStatus');
+    if (!text || !text.trim()) {
+      statusEl.textContent = 'Add a CSV file or paste some transaction lines first.';
+      return;
+    }
+    var transactions = parseStatementText(text);
+    if (!transactions.length) {
+      statusEl.textContent = 'Could not find any date and amount pairs in that input.';
+      candidates = [];
+      renderCandidates();
+      return;
+    }
+    candidates = detectCandidates(transactions);
+    if (!candidates.length) {
+      statusEl.textContent = 'Read ' + transactions.length + ' transaction line(s), no recurring charges stood out.';
+    } else {
+      statusEl.textContent = 'Read ' + transactions.length + ' transaction line(s), found ' + candidates.length + ' possible subscription(s).';
+    }
+    renderCandidates();
+  }
+
+  function handleScanClick() {
+    var fileInput = document.getElementById('csvFile');
+    var pasteText = document.getElementById('pasteInput').value;
+
+    if (fileInput.files && fileInput.files.length) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          runScan(String(e.target.result || ''));
+        } catch (err) {
+          document.getElementById('scanStatus').textContent = 'Could not read that file.';
+        }
+      };
+      reader.onerror = function () {
+        document.getElementById('scanStatus').textContent = 'Could not read that file.';
+      };
+      try {
+        reader.readAsText(fileInput.files[0]);
+      } catch (err) {
+        document.getElementById('scanStatus').textContent = 'Could not read that file.';
+      }
+    } else {
+      runScan(pasteText);
+    }
+  }
+
+  function initEvents() {
+    document.getElementById('subForm').addEventListener('submit', handleSubmit);
+    document.getElementById('cancelBtn').addEventListener('click', resetForm);
+    document.getElementById('scanBtn').addEventListener('click', handleScanClick);
+
+    document.getElementById('toggleCategory').addEventListener('click', function () {
+      chartMode = 'category';
+      document.getElementById('toggleCategory').classList.add('active');
+      document.getElementById('toggleService').classList.remove('active');
+      renderChart();
+    });
+
+    document.getElementById('toggleService').addEventListener('click', function () {
+      chartMode = 'service';
+      document.getElementById('toggleService').classList.add('active');
+      document.getElementById('toggleCategory').classList.remove('active');
+      renderChart();
+    });
+
+    var headers = document.querySelectorAll('th[data-sort]');
+    for (var i = 0; i < headers.length; i++) {
+      headers[i].addEventListener('click', function () {
+        var key = this.getAttribute('data-sort');
+        if (sortState.key === key) {
+          sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortState.key = key;
+          sortState.dir = 'asc';
+        }
+        renderList();
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      var isDeleteBtn = e.target && e.target.classList && e.target.classList.contains('row-btn');
+      if (!isDeleteBtn && confirmingId !== null) {
+        confirmingId = null;
+        renderList();
+      }
+    });
+  }
+
+  function seedDefaultDate() {
+    var input = document.getElementById('renewalDate');
+    var d = new Date();
+    d.setDate(d.getDate() + 30);
+    input.value = d.toISOString().slice(0, 10);
+  }
+
+  function init() {
+    subs = loadData();
+    initEvents();
+    seedDefaultDate();
+    renderList();
+    renderChart();
+    renderSummary();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+
+</body>
+</html>
